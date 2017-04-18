@@ -1,9 +1,3 @@
-#source activate py35
-#/Users/dlacy/dev/machine_learning_tutorial/spark-2.1.0-bin-hadoop2.7/bin/spark-submit --master local[6] /Users/dlacy/dev/BuildingMachineLearningSystemsWithPython/ch03/create_LG_dict_via_spark.py
-
-#from sklearn.feature_extraction.text import TfidfVectorizer
-#from sklearn.externals import joblib
-#from pyspark.ml.feature import HashingTF, IDF, Tokenizer
 import json
 import re
 
@@ -16,22 +10,6 @@ from pyspark.ml.feature import CountVectorizer
 from pyspark.ml.feature import StopWordsRemover
 from pyspark.ml.feature import Word2Vec
 from pyspark.ml.clustering import KMeans
-
-def extract_text(content):
-    soup = BeautifulSoup(content, "lxml")
-
-    # kill all script and style elements
-    for script in soup(["script", "style"]):
-        script.extract()
-
-    headerdiv = soup.find("div", {"id": "s-lg-guide-header-info"})
-    maindiv = soup.find("div", {"id": "s-lg-guide-main"})
-
-    if headerdiv and maindiv:
-        return headerdiv.get_text() + maindiv.get_text()
-    else:
-        return
-
 
 
 def readguide(guide):
@@ -68,7 +46,7 @@ conf = SparkConf().setMaster("local").setAppName("My App")
 sc = SparkContext(conf=conf)
 spark = SparkSession(sc)
 
-guides = glob("data/libguides/all_guides_json/*")
+guides = glob("data/all_guides.json/*")
 
 print("---------- ", type(guides))
 

@@ -25,9 +25,7 @@ for guide in d:
         print("   - ", filepath)
         response = urllib.request.urlopen(url)
         content = response.read().decode('utf-8')
-        # f = open(filepath, "wb")
-        # f.write(content)
-        # f.close()
+
         import json
 
         with open(filepath, 'w') as outfile:
