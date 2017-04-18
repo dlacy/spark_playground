@@ -46,11 +46,11 @@ conf = SparkConf().setMaster("local").setAppName("My App")
 sc = SparkContext(conf=conf)
 spark = SparkSession(sc)
 
-guides = glob("data/all_guides.json/*")
+guides = glob("data/guides/*")
 
 print("---------- ", type(guides))
 
-# create an RDD consisting of a list of paths to .html files
+# create an RDD consisting of a list of paths to .json files
 guidesRDD = sc.parallelize(guides[0:10])
 #guidesRDD = sc.parallelize(guides)
 
@@ -81,7 +81,7 @@ print(" -------------- type(texts): ", type(texts))
 #print(" -------------- print(texts): ", texts)
 
 # save to parquet
-textsDFrame.select("guide_id", "page_id", "words").write.save("libguides.parquet", format="parquet")
+textsDFrame.select("guide_id", "page_id", "words").write.save("data/libguides_bow.parquet", format="parquet")
 
 """
 
