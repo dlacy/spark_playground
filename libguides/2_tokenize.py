@@ -25,7 +25,7 @@ df = HashingTFData
 
 
 # fit a CountVectorizerModel from the corpus.
-cv = CountVectorizer(inputCol="words", outputCol="cv_features", vocabSize=10, minDF=2.0, minTF=3.0)
+cv = CountVectorizer(inputCol="stop_removed", outputCol="cv_features", vocabSize=10, minDF=2.0, minTF=3.0)
 transformer = cv.fit(df)
 CountVectorizerData = transformer.transform(df)
 
