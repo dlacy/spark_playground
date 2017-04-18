@@ -11,7 +11,6 @@ from pyspark.ml.feature import StopWordsRemover
 from pyspark.ml.feature import Word2Vec
 from pyspark.ml.clustering import KMeans
 
-
 def readguide(guide):
     with open(guide, 'r') as myfile:
         return myfile.read()
@@ -38,9 +37,11 @@ def extract_text(content_str):
         if isinstance(txt, str):
             return [content[0], content[1], txt.split(" ")]
         else:
-            return
+            # if not a string, insert a space to make it one to avoid null content
+            return [content[0], content[1], " "]
     else:
-        return
+        # return empty string to avoid null content
+        return [content[0], content[1], " "]
 
 conf = SparkConf().setMaster("local").setAppName("My App")
 sc = SparkContext(conf=conf)
@@ -48,69 +49,21 @@ spark = SparkSession(sc)
 
 guides = glob("data/guides/*")
 
-print("---------- ", type(guides))
-
 # create an RDD consisting of a list of paths to .json files
-guidesRDD = sc.parallelize(guides[0:10])
-#guidesRDD = sc.parallelize(guides)
-
-print("---------- guidesRDD.first():  ", guidesRDD.first())
-print("---------- guidesRDD.count():  ", guidesRDD.count())
+#guidesRDD = sc.parallelize(guides[0:10])
+guidesRDD = sc.parallelize(guides)
 
 # create an RDD containing html documents
 documentsRDD = guidesRDD.map(lambda guide: readguide(guide))
 
-print("---------- documentsRDD.first():  ", documentsRDD.first())
-print("---------- documentsRDD.count():  ", documentsRDD.count())
-
 # create RDD containg plain text derived from html, guide id, and page_id
 textsRDD = documentsRDD.map(lambda document: extract_text(document))
-
-print("---------- textsRDD.count():  ", textsRDD.count())
-print("---------- textsRDD.first():  ", textsRDD.first())
-print("---------- textsRDD.first():  ", type(textsRDD.first()))
 
 textsDFrame = textsRDD.toDF(["guide_id", "page_id", "words"])
 
 textsDFrame.show(10)
 
-texts = textsDFrame.collect()
-
-print(" -------------- len(texts): ", len(texts))
-print(" -------------- type(texts): ", type(texts))
-#print(" -------------- print(texts): ", texts)
+textsDFrame.printSchema()
 
 # save to parquet
 textsDFrame.select("guide_id", "page_id", "words").write.save("data/libguides_bow.parquet", format="parquet")
-
-"""
-
-
-"""
-"""
-# Trains a k-means model.
-kmeans = KMeans().setK(2).setSeed(1)
-model = kmeans.fit(vectoredDFrame)
-
-# Evaluate clustering by computing Within Set Sum of Squared Errors.
-wssse = model.computeCost(res)
-print("Within Set Sum of Squared Errors = " + str(wssse))
-
-# Shows the result.
-centers = model.clusterCenters()
-print("Cluster Centers: ")
-for center in centers:
-    print(center)
-"""
-"""
-texts = textsRDD.collect()
-
-print(" -------------- len(texts): ", len(texts))
-print(" -------------- type(texts): ", type(texts))
-#print(" -------------- print(texts): ", texts)
-
-joblib.dump(texts, 'data/libguides.pkl')
-
-with open('data/libguides.json', 'w') as outfile:
-    json.dump(texts, outfile)
-"""
