@@ -35,13 +35,14 @@ def extract_text(content_str):
         # remove whitespace
         txt = ' '.join(txt.split())
         if isinstance(txt, str):
-            return [content[0], content[1], txt.split(" ")]
+            #return [content[0], content[1], txt.split(" ")]
+            return [content[0], content[1], txt]
         else:
-            # if not a string, insert a space to make it one to avoid null content
-            return [content[0], content[1], " "]
+            return None
+
     else:
-        # return empty string to avoid null content
-        return [content[0], content[1], " "]
+        return None
+
 
 conf = SparkConf().setMaster("local").setAppName("My App")
 sc = SparkContext(conf=conf)
@@ -58,12 +59,20 @@ documentsRDD = guidesRDD.map(lambda guide: readguide(guide))
 
 # create RDD containg plain text derived from html, guide id, and page_id
 textsRDD = documentsRDD.map(lambda document: extract_text(document))
+#print(" ----------- textsRDD.count()", textsRDD.count())
 
-textsDFrame = textsRDD.toDF(["guide_id", "page_id", "words"])
+filteredRDD = textsRDD.filter(lambda x: x is not None)
+#print(" ----------- raw.count()", raw.count())
 
-textsDFrame.show(10)
+#print(textsRDD.take(1000))
 
-textsDFrame.printSchema()
+rawDFrame = filteredRDD.toDF(["guide_id", "page_id", "words"])
+
+
+#textsDFrame = raw.filter("words != ' '")
+#rawDFrame.show(1000)
+
+#textsDFrame.printSchema()
 
 # save to parquet
-textsDFrame.select("guide_id", "page_id", "words").write.save("data/libguides_bow.parquet", format="parquet")
+rawDFrame.select("guide_id", "page_id", "words").write.save("data/libguides_bow.parquet", format="parquet")
