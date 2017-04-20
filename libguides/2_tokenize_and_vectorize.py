@@ -26,12 +26,12 @@ StopWordsRemoverData = remover.transform(guidesDFrame)
 StopWordsRemoverData.show(10)
 guidesDFrame = StopWordsRemoverData
 
-
+#https://spark.apache.org/docs/latest/ml-features.html#tf-idf
 hashingTF = HashingTF(inputCol="stop_removed", outputCol="HashingTF", numFeatures=1000)
 featurizedData = hashingTF.transform(StopWordsRemoverData)
 guidesDFrame = featurizedData
-# alternatively, CountVectorizer can also be used to get term frequency vectors
 
+#
 cv = CountVectorizer(inputCol="stop_removed", outputCol="CountVectorizer", vocabSize=1000, minDF=1.0, minTF=2.0)
 transformer = cv.fit(guidesDFrame)
 print(" ----------- ", transformer.vocabulary)
@@ -48,5 +48,6 @@ idfModel = idf.fit(guidesDFrame)
 rescaledData = idfModel.transform(guidesDFrame)
 guidesDFrame = rescaledData
 
-guidesDFrame.select("guide_id", "page_id", "HashingTF", "CountVectorizer", "IDF_HashingTF", "IDF_CountVectorizer").show(truncate=False)
+guidesDFrame.write.save("data/guides_tokenized_and_vectorized.parquet", format="parquet")
+#guidesDFrame.select("guide_id", "page_id", "HashingTF", "CountVectorizer", "IDF_HashingTF", "IDF_CountVectorizer").show(truncate=False)
 
