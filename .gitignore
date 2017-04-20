@@ -1,3 +1,4 @@
 .idea/
 libguides/data/guides
 libguides/data/libguides_bow.parquet
+libguides/data/guides_tokenized_and_vectorized.parquet
