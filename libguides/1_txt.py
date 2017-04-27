@@ -10,36 +10,34 @@ from pyspark.ml.feature import CountVectorizer
 from pyspark.ml.feature import StopWordsRemover
 from pyspark.ml.feature import Word2Vec
 from pyspark.ml.clustering import KMeans
-
-def readguide(guide):
-    with open(guide, 'r') as myfile:
-        return myfile.read()
+from pyspark.sql.types import StructType, StructField, IntegerType, StringType
 
 def extract_text(content_str):
-    content = json.loads(content_str)
 
-    soup = BeautifulSoup(content[2], "lxml")
+    if content_str is not None:
+        soup = BeautifulSoup(content_str, "lxml")
 
-    # kill all script and style elements
-    for script in soup(["script", "style"]):
-        script.extract()
+        # kill all script and style elements
+        for script in soup(["script", "style"]):
+            script.extract()
 
-    headerdiv = soup.find("div", {"id": "s-lg-guide-header-info"})
-    maindiv = soup.find("div", {"id": "s-lg-guide-main"})
+        headerdiv = soup.find("div", {"id": "s-lg-guide-header-info"})
+        maindiv = soup.find("div", {"id": "s-lg-guide-main"})
 
-    if headerdiv and maindiv:
-        txt = " ".join(headerdiv.strings).replace('\n', ' ') + " ".join(maindiv.strings).replace('\n', ' ')
-        # remove non-alpha/numeric
-        regex = re.compile('[^a-zA-Z]')
-        txt = regex.sub(" ", txt)
-        # remove whitespace
-        txt = ' '.join(txt.split())
-        if isinstance(txt, str):
-            #return [content[0], content[1], txt.split(" ")]
-            return [content[0], content[1], txt]
+        if headerdiv and maindiv:
+            txt = " ".join(headerdiv.strings).replace('\n', ' ') + " ".join(maindiv.strings).replace('\n', ' ')
+            # remove non-alpha/numeric
+            regex = re.compile('[^a-zA-Z]')
+            txt = regex.sub(" ", txt)
+            # remove whitespace
+            txt = ' '.join(txt.split())
+            if isinstance(txt, str):
+                return txt
+            else:
+                return None
+
         else:
             return None
-
     else:
         return None
 
@@ -48,31 +46,27 @@ conf = SparkConf().setMaster("local").setAppName("My App")
 sc = SparkContext(conf=conf)
 spark = SparkSession(sc)
 
-guides = glob("data/guides/*")
+# Define udf
+from pyspark.sql.functions import udf
+udfextract_text=udf(extract_text, StringType())
 
-# create an RDD consisting of a list of paths to .json files
-#guidesRDD = sc.parallelize(guides[0:10])
-guidesRDD = sc.parallelize(guides)
-
-# create an RDD containing html documents
-documentsRDD = guidesRDD.map(lambda guide: readguide(guide))
-
-# create RDD containg plain text derived from html, guide id, and page_id
-textsRDD = documentsRDD.map(lambda document: extract_text(document))
-#print(" ----------- textsRDD.count()", textsRDD.count())
-
-filteredRDD = textsRDD.filter(lambda x: x is not None)
-#print(" ----------- raw.count()", raw.count())
-
-#print(textsRDD.take(1000))
-
-rawDFrame = filteredRDD.toDF(["guide_id", "page_id", "words"])
+raw = spark.read.load("data/all_guides.parquet")
+raw.show(10)
 
 
-#textsDFrame = raw.filter("words != ' '")
-#rawDFrame.show(1000)
+print(" ---------- done load raw")
 
-#textsDFrame.printSchema()
+#textsDF = raw.limit(10).withColumn("words", udfextract_text(raw.content))
+textsDF = raw.withColumn("words", udfextract_text(raw.content))
+
+print(" ---------- done textDF")
+textsDF.show(10)
+
+print(" -------- textsDF.count(): ", textsDF.count())
+
+#not_nulDF = textsDF.filter("words is not null")
+#print(" -------- not_nulDF.count(): ", not_nulDF.count())
+
 
 # save to parquet
-rawDFrame.select("guide_id", "page_id", "words").write.save("data/libguides_bow.parquet", format="parquet")
+textsDF.write.save("data/libguides_bow.parquet", format="parquet")
