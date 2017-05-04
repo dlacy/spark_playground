@@ -21,16 +21,31 @@ def extract_text(content_str):
         for script in soup(["script", "style"]):
             script.extract()
 
+        subject = soup.find("meta",  attrs={'name':'DC.Subject'})
+        description = soup.find("meta",  attrs={'name':'DC.Description'})
+
+        subject_txt = ""
+        description_txt = ""
+
+        for i in range(0,19):
+            subject_txt += subject["content"] + " "
+
+        for i in range(0,9):
+            description_txt += description["content"] + " "
+
+        #print(" -------- ", subject_txt, " ---------- ", description_txt)
+
         headerdiv = soup.find("div", {"id": "s-lg-guide-header-info"})
         maindiv = soup.find("div", {"id": "s-lg-guide-main"})
 
         if headerdiv and maindiv:
-            txt = " ".join(headerdiv.strings).replace('\n', ' ') + " ".join(maindiv.strings).replace('\n', ' ')
+            txt = subject_txt + description_txt + " ".join(headerdiv.strings).replace('\n', ' ') + " ".join(maindiv.strings).replace('\n', ' ')
             # remove non-alpha/numeric
             regex = re.compile('[^a-zA-Z]')
             txt = regex.sub(" ", txt)
             # remove whitespace
             txt = ' '.join(txt.split())
+
             if isinstance(txt, str):
                 return txt
             else:
@@ -69,4 +84,4 @@ print(" -------- textsDF.count(): ", textsDF.count())
 
 
 # save to parquet
-textsDF.write.save("data/libguides_bow.parquet", format="parquet")
+textsDF.write.save("data/libguides_txt.parquet", format="parquet")
