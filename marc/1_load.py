@@ -13,7 +13,7 @@ df = spark.read.load("marc/bibs.parquet")
 
 #df.show(10)
 
-
+"""
 def get_title(marc):
     marc_io = io.StringIO()
     marc_io.write(marc)
@@ -33,7 +33,7 @@ def get_subjects(marc):
                                               'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z')
             subjects.extend(subfields)
         return subjects
-
+"""
 def gt(topicDistribution):
     global vocabulary
     global topics
@@ -51,7 +51,8 @@ def get_topic(index, topicDistribution):
     global vocabulary
     global topics
     #global index
-    c = [b[0] for b in sorted(enumerate(topicDistribution), key=lambda i:i[1])]
+    sorted_list = [b[0] for b in sorted(enumerate(topicDistribution), key=lambda i:i[1])]
+    c = sorted_list[-4:]
     #index = 3
     words = []
     for word_id in topics[c[index]]["termIndices"]:
@@ -72,35 +73,41 @@ def get_topic_1(topicDistribution):
 def get_topic_0(topicDistribution):
     return get_topic(0, topicDistribution)
 
-def flatten_subjects(subjects):
-    return " ".join(subjects)
+def flatten_text(strings):
+    return " ".join(strings)
 
 # Define udf
 from pyspark.sql.functions import udf
-udf_get_title = udf(get_title, StringType())
-udf_get_subjects = udf(get_subjects, ArrayType(StringType()))
-udf_flatten_subjects = udf(flatten_subjects, StringType())
+#udf_get_title = udf(get_title, StringType())
+#udf_get_subjects = udf(get_subjects, ArrayType(StringType()))
+udf_flatten_text = udf(flatten_text, StringType())
+
 udf_get_topic = udf(gt)
 udf_get_topic_3 = udf(get_topic_3, StructType([StructField("cluster_id", IntegerType()), StructField("score", FloatType()), StructField("value", StringType())]))
 udf_get_topic_2 = udf(get_topic_2, StructType([StructField("cluster_id", IntegerType()), StructField("score", FloatType()), StructField("value", StringType())]))
 udf_get_topic_1 = udf(get_topic_1, StructType([StructField("cluster_id", IntegerType()), StructField("score", FloatType()), StructField("value", StringType())]))
 udf_get_topic_0 = udf(get_topic_0, StructType([StructField("cluster_id", IntegerType()), StructField("score", FloatType()), StructField("value", StringType())]))
 
-newDF = df.withColumn("title", udf_get_title(df.marc)).withColumn("marc_subjects", udf_get_subjects(df.marc))
-df = newDF.withColumn("full_text", udf_flatten_subjects(newDF.marc_subjects))
+#newDF = df.withColumn("title", udf_get_title(df.marc)).withColumn("marc_subjects", udf_get_subjects(df.marc))
+newDF = df.withColumn("allTextString", udf_flatten_text(df.allTextArray))
 
-tokenizer = RegexTokenizer(inputCol="full_text", outputCol="word_tokens", pattern="\\W")
+df = newDF
+
+df.show(10, False)
+
+
+tokenizer = RegexTokenizer(inputCol="allTextString", outputCol="word_tokens", pattern="\\W")
 TokenizerData = tokenizer.transform(df)
 df = TokenizerData
 
 remover = StopWordsRemover(inputCol="word_tokens", outputCol="stop_removed")
-my_sw = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
+my_sw = ['united', 'states', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
 sw = remover.loadDefaultStopWords("english")
 remover.setStopWords(sw + my_sw)
 StopWordsRemoverData = remover.transform(df)
 df = StopWordsRemoverData
 
-cv = CountVectorizer(inputCol="stop_removed", outputCol="CountVectorizer", vocabSize=1000, minDF=1.0, minTF=3.0)
+cv = CountVectorizer(inputCol="stop_removed", outputCol="CountVectorizer", vocabSize=1000, minDF=1.0, minTF=1.0)
 transformer = cv.fit(df)
 print(" ----------- ", transformer.vocabulary)
 vacabulary = transformer.vocabulary
@@ -108,13 +115,13 @@ CountVectorizerData = transformer.transform(df)
 df = CountVectorizerData
 
 # Trains a LDA model.
-lda = LDA(k=4, maxIter=15, featuresCol="CountVectorizer")
+lda = LDA(k=100, maxIter=20, featuresCol="CountVectorizer")
 model = lda.fit(df)
 print("------------")
 model.vocabSize()
 print("------------")
-model.describeTopics(maxTermsPerTopic=10).show(10, False)
-topics = model.describeTopics(maxTermsPerTopic=10).collect()
+model.describeTopics(maxTermsPerTopic=20).show(10, False)
+topics = model.describeTopics(maxTermsPerTopic=20).collect()
 print(topics)
 
 for topic in topics:
@@ -138,7 +145,8 @@ test = df.select("id", "marc_subjects", "topicDistribution")\
     .withColumn("topic_3", udf_get_topic(df.topicDistribution))
 """
 
-test = df.select("id", "marc_subjects", "topicDistribution")\
+
+test = df.select("id", "subjects", "topicDistribution", "stop_removed")\
     .withColumn("topic_3", udf_get_topic_3(df.topicDistribution))\
     .withColumn("topic_2", udf_get_topic_2(df.topicDistribution))\
     .withColumn("topic_1", udf_get_topic_1(df.topicDistribution))\
@@ -149,14 +157,13 @@ test.show(10, False)
 df = test.drop("topicDistribution")
 print(df.printSchema())
 
-
 records = df.write\
     .format("org.elasticsearch.spark.sql")\
     .option("es.nodes", "localhost")\
     .option("es.port", "9200")\
     .option("es.nodes.wan.only", "true")\
     .option("es.resouce.auto.create", "marc/test")\
-    .option("es.read.field.as.array.include", "marc_subjects")\
+    .option("es.read.field.as.array.include", "subjects")\
     .mode("append")\
     .save("marc/record")
 
